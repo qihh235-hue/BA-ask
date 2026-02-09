@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>BA - 销售实战驾驶舱 v8.0</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --ba-green: #3aae36; --ba-dark: #1e293b; --ba-light-green: #e8f5e9; --border: #e2e8f0; }
+        body { font-family: 'Outfit', 'PingFang SC', sans-serif; background: #f8fafc; margin: 0; display: flex; height: 100vh; color: #334155; }
+        
+        /* 左侧：精美档案卡 */
+        .sidebar { width: 380px; background: white; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 0; box-shadow: 10px 0 15px rgba(0,0,0,0.02); }
+        .sidebar-header { padding: 30px; background: var(--ba-dark); color: white; text-align: center; }
+        .sidebar-header img { width: 140px; margin-bottom: 10px; }
+        
+        .crm-data-card { padding: 25px; flex: 1; overflow-y: auto; }
+        .data-group { background: #f1f5f9; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .data-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; display: block; }
+        .data-value { font-size: 16px; font-weight: 600; color: var(--ba-dark); word-break: break-all; }
+        
+        .insight-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .tag-pill { background: var(--ba-green); color: white; padding: 4px 12px; border-radius: 50px; font-size: 12px; font-weight: 500; }
+
+        .sidebar-footer { padding: 20px; border-top: 1px solid var(--border); }
+        .btn-xl { background: var(--ba-green); color: white; border: none; padding: 14px; border-radius: 10px; width: 100%; cursor: pointer; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; }
+        .btn-xl:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(58,174,54,0.3); }
+
+        /* 右侧：对话主舞台 */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .top-status { height: 70px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 30px; justify-content: space-between; }
+        .status-indicator { display: flex; gap: 40px; }
+        .status-item b { color: var(--ba-green); font-size: 18px; }
+
+        #chat-area { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 20px 20px; }
+        .bubble { max-width: 70%; padding: 16px 20px; border-radius: 20px; font-size: 15px; line-height: 1.6; position: relative; }
+        .bubble.dr { background: white; align-self: flex-start; border: 1px solid var(--border); border-bottom-left-radius: 2px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .bubble.me { background: var(--ba-green); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+
+        .options-tray { background: white; padding: 30px; border-top: 1px solid var(--border); }
+        .option-card { border: 1px solid var(--border); padding: 18px; border-radius: 12px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; justify-content: space-between; }
+        .option-card:hover { border-color: var(--ba-green); background: var(--ba-light-green); }
+        .option-card::after { content: "➔"; color: var(--ba-green); font-weight: bold; }
+
+        /* 初始遮罩 */
+        #welcome { position: absolute; inset: 0; background: white; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
+        .input-box { width: 350px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; margin-bottom: 20px; font-size: 16px; outline: none; text-align: center; }
+        .input-box:focus { border-color: var(--ba-green); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <img src="https://bostonaesthetics.com.design.com.mk/en-US/wp-content/uploads/2024/12/BA-Logo-256.png">
+            <div style="font-size: 12px; opacity: 0.8;">Smart Sales CRM System</div>
+        </div>
+
+        <div class="crm-data-card">
+            <div class="section-title" style="font-weight:700; margin-bottom:15px">客户档案数据</div>
+            
+            <div class="data-group">
+                <span class="data-label">客户姓名 (Name)</span>
+                <div class="data-value" id="disp-name">未录入</div>
+            </div>
+
+            <div class="data-group">
+                <span class="data-label">联系电话 (Contact)</span>
+                <div class="data-value" id="disp-phone">未录入</div>
+            </div>
+
+            <div class="data-group">
+                <span class="data-label">实时洞察标签 (Insights Tags)</span>
+                <div class="insight-tags" id="disp-tags">
+                    <span style="color:#94a3b8; font-size:13px">等待拜访生成...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="btn-xl" onclick="exportToExcel()">
+                <span>📄 导出报表 (Excel)</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="main">
+        <div id="welcome">
+            <h1 style="margin-bottom:10px">新客户访谈</h1>
+            <p style="color:#64748b; margin-bottom:40px">系统将从10个实战题库中随机抽取3个挑战</p>
+            <input type="text" id="in-name" class="input-box" placeholder="客户姓名">
+            <input type="text" id="in-phone" class="input-box" placeholder="联系电话">
+            <button class="btn-xl" style="width: 350px;" onclick="startVisit()">进入访谈驾驶舱</button>
+        </div>
+
+        <div class="top-status">
+            <div style="font-weight: 700;">BA 实战助理 v8.0 (随机题库版)</div>
+            <div class="status-indicator">
+                <div class="status-item">成交意向: <b id="stat-win">0%</b></div>
+                <div class="status-item">合规安全: <b id="stat-risk" style="color:var(--ba-green)">SAFE</b></div>
+            </div>
+        </div>
+
+        <div id="chat-area"></div>
+
+        <div class="options-tray" id="tray">
+            <div style="font-size: 11px; color:#94a3b8; margin-bottom:15px; font-weight:700; text-transform:uppercase">Suggested Strategies</div>
+            <div id="options-list"></div>
+        </div>
+    </div>
+
+<script>
+    let visitData = { name: "", phone: "", tags: [], logs: [], win: 0, risk: 0 };
+    
+    // 扩充至 10 个问题的题库
+    const fullPool = [
+        { q: "半岛超声炮现在市场上风很大，但朋友圈全是低价引流。我这一台机器卖这么贵，怎么跟路边店竞争？", opts: [
+        { t: "“主任，咱们是正规机构。我们建议主打‘四点验证’扫码防伪和您的专业操作，用医疗标准对标生活美容。”", tag: "品牌价值派", win: 15, risk: 0 },
+        { t: "“价格我们可以通过增加疗程赠品来平衡，或者针对熟客做内部特价方案。”", tag: "价格防御派", win: 10, risk: 10 }
+    ]},
+    { q: "隔壁诊所买的皮秒是‘水货’。我买半岛的黄金微针，能保证在这个片区给我‘独家授权’吗？", opts: [
+        { t: "“独家授权涉及法律合规。但我们可以为您颁发‘临床示范中心’铭牌，并在官方地图上标注您的机构。”", tag: "合规准入派", win: 12, risk: -5 },
+        { t: "“只要您拿货量达标，我可以口头保证半年内不给您方圆3公里的同行供货。”", tag: "口头承诺派", win: 18, risk: 30 }
+    ]},
+    { q: "黄金微针的操作头是耗材吧？为了给患者省钱，我用酒精消毒后重复使用，会有风险吗？", opts: [
+        { t: "“坚决不可！针头涂层损坏会引起表皮烫伤，且无法保证无菌。半岛坚持‘一人一头’是底线。”", tag: "临床严谨型", win: 10, risk: -20 },
+        { t: "“建议尽量还是换新的。如果一定要复用，只能针对同一个患者，但我们不推荐这样做。”", tag: "风险默认型", win: 5, risk: 50 }
+    ]},
+    { q: "都说超声炮是‘国产之光’，但参数比进口的超声刀弱，到底能不能达到深层提拉的效果？", opts: [
+        { t: "“超声炮采用的是‘大焦域’技术，在保证深度的同时大大降低了痛感，更适合中国人的面部结构。”", tag: "技术解构型", win: 20, risk: 0 },
+        { t: "“参数虽然略低，但我们操作次数多，叠加效应下效果不输进口机器。”", tag: "经验替代型", win: 10, risk: 5 }
+    ]},
+    { q: "我想在直播间宣传‘一次即刻年轻5岁’，配上超声炮的Logo，你们厂家支持这种宣传吗？", opts: [
+        { t: "“医疗广告禁止承诺疗效。建议宣传‘面部轮廓精雕’，并使用官方认证的合规模特素材。”", tag: "稳健合规型", win: 15, risk: 0 },
+        { t: "“只要不点名具体的‘5岁’，模糊一点说‘逆龄神器’是可以尝试的。”", tag: "营销边缘型", win: 18, risk: 40 }
+    ]},
+    { q: "半岛的私密超声刀（私密炮）现在拿到了三类医疗器械证吗？院里对证件抓得很死。", opts: [
+        { t: "“半岛一直走合规路线，相关型号均有明确的准入证件。这是全套注册证复印件，请您审阅。”", tag: "正规军型", win: 20, risk: 0 },
+        { t: "“目前证件在流程中，我们可以先以‘皮肤科项目’的名义进入，证件很快就下来。”", tag: "违规准入型", win: 0, risk: 60 }
+    ]},
+    { q: "黄金微针4.0的负压头，患者反馈吸力太大会产生瘀斑，我能不能直接关掉负压操作？", opts: [
+        { t: "“负压是为了保证出针均匀。如果产生瘀斑，建议调整负压等级而非直接关闭，我会来协助您调机。”", tag: "专业服务型", win: 15, risk: 0 },
+        { t: "“关掉也可以，不过出针深度就没那么准了，您可以根据手感自己掌握。”", tag: "随意操作型", win: 5, risk: 30 }
+    ]},
+    { q: "超声炮的炮头和刀头，一个疗程下来成本太高了。能不能给点折扣？", opts: [
+        { t: "“耗材价格是全国统一的。但我可以帮您申请更多的院内宣教支持或术后修复耗材赠送。”", tag: "价值转换型", win: 12, risk: 5 },
+        { t: "“如果您这次能订100个头，我可以私下跟代理商谈，返您几个点。”", tag: "利益驱动型", win: 20, risk: 40 }
+    ]},
+    { q: "半岛的机器故障率好像比进口的高？万一机器在操作中突然死机烧伤患者怎么办？", opts: [
+        { t: "“半岛有三重安全自检系统，瞬时断电保护。且我们在本市有24小时工程师上门服务。”", tag: "保障完善型", win: 15, risk: 0 }
+        ]}
+    ];
+
+    let scriptPool = []; // 用于存放本次随机抽取的3题
+    let currentStep = 0;
+
+    function startVisit() {
+        const n = document.getElementById('in-name').value;
+        const p = document.getElementById('in-phone').value;
+        if(!n || !p) return alert("请完整填写信息");
+        
+        visitData.name = n;
+        visitData.phone = p;
+        document.getElementById('disp-name').innerText = n;
+        document.getElementById('disp-phone').innerText = p;
+        document.getElementById('welcome').style.display = 'none';
+        
+        // 随机抽取 3 题逻辑
+        scriptPool = fullPool.sort(() => 0.5 - Math.random()).slice(0, 3);
+        
+        renderStep();
+    }
+
+    function renderStep() {
+        if(currentStep >= scriptPool.length) {
+            addBubble("拜访结束。数据已同步，可导出 Excel 报表。", "dr");
+            document.getElementById('options-list').innerHTML = "<b>拜访已完成，请导出报表。</b>";
+            return;
+        }
+        const data = scriptPool[currentStep];
+        addBubble(data.q, "dr");
+        
+        const list = document.getElementById('options-list');
+        list.innerHTML = "";
+        data.opts.forEach(o => {
+            const btn = document.createElement('div');
+            btn.className = "option-card";
+            btn.innerText = o.t;
+            btn.onclick = () => {
+                addBubble(o.t, "me");
+                updateStats(o);
+                currentStep++;
+                setTimeout(renderStep, 800);
+            };
+            list.appendChild(btn);
+        });
+    }
+
+    function addBubble(txt, role) {
+        const box = document.getElementById('chat-area');
+        const b = document.createElement('div');
+        b.className = `bubble ${role}`;
+        b.innerText = txt;
+        box.appendChild(b);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateStats(o) {
+        visitData.win += o.win;
+        visitData.risk += o.risk;
+        visitData.tags.push(o.tag);
+        visitData.logs.push(`医: ${scriptPool[currentStep].q} | 销: ${o.t}`);
+        
+        document.getElementById('stat-win').innerText = Math.max(0, visitData.win) + "%";
+        const r = document.getElementById('stat-risk');
+        if(visitData.risk > 30) { 
+            r.innerText = "WARNING"; 
+            r.style.color = "red"; 
+        } else {
+            r.innerText = "SAFE";
+            r.style.color = "var(--ba-green)";
+        }
+        
+        const tagBox = document.getElementById('disp-tags');
+        if(currentStep === 0) tagBox.innerHTML = "";
+        const span = document.createElement('span');
+        span.className = "tag-pill";
+        span.innerText = o.tag;
+        tagBox.appendChild(span);
+    }
+
+    function exportToExcel() {
+        if(!visitData.name) return alert("无数据");
+        const rows = [
+            ["Boston Aesthetics 拜访报告", ""],
+            ["客户姓名", visitData.name],
+            ["联系电话", visitData.phone],
+            ["最终意向", visitData.win + "%"],
+            ["标签分析", visitData.tags.join(", ")],
+            ["", ""],
+            ["对话流水", ""]
+        ];
+        visitData.logs.forEach((l, i) => rows.push([`场景 ${i+1}`, l]));
+        
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "拜访记录");
+        XLSX.writeFile(wb, `BA_CRM_${visitData.name}.xlsx`);
+    }
+</script>
+
+</body>
+</html>
